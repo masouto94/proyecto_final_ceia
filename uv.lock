@@ -1838,20 +1838,26 @@ wheels = [
 [[package]]
 name = "proyecto-final-ceia"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "datasets" },
+    { name = "huggingface-hub" },
     { name = "ipykernel" },
     { name = "jupyter" },
     { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "requests" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "datasets", specifier = ">=5.0.1" },
+    { name = "huggingface-hub", specifier = ">=0.25.0" },
     { name = "ipykernel", specifier = ">=7.3.0" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "pandas", specifier = ">=3.0.5" },
+    { name = "pyarrow", specifier = ">=18.0.0" },
+    { name = "requests", specifier = ">=2.32.0" },
 ]
 
 [[package]]
