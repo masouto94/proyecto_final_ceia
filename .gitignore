@@ -12,3 +12,5 @@ wheels/
 # Datos descargados/generados (raw y muestras)
 data/
 .ipynb_checkpoints/
+
+*.pyc
