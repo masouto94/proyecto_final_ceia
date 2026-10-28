@@ -7,8 +7,10 @@ de a chunks, algunas categorías (p. ej. metadata de `Software`, que agrega camp
 fila evita depender de un esquema homogéneo entre categorías.
 """
 
+import hashlib
 import json
 import random
+from collections import Counter
 from pathlib import Path
 
 import pandas as pd
@@ -65,6 +67,91 @@ def metadata_for_sampled_asins(category: str, asins: set) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     df["category"] = category
     return df
+
+
+HASH_BUCKETS = 10_000
+
+# (etiqueta, mínimo, máximo inclusive; None = sin tope) de #reviews totales del usuario
+DEFAULT_ACTIVITY_TIERS = [("1", 1, 1), ("2-4", 2, 4), ("5+", 5, None)]
+
+
+def user_in_hash_sample(user_id: str, fraction: float, salt: str = "") -> bool:
+    """Decide si el usuario entra, de forma determinística y consistente entre categorías.
+
+    Usa md5 (no `hash()`, que cambia entre procesos) para que el mismo `user_id` dé la misma
+    decisión en cualquier corrida, categoría o máquina.
+    """
+    digest = hashlib.md5(f"{salt}{user_id}".encode()).digest()
+    return int.from_bytes(digest[:8], "big") % HASH_BUCKETS < fraction * HASH_BUCKETS
+
+
+def _tier_of(n_reviews: int, tiers: list[tuple[str, int, int | None]]) -> str | None:
+    for label, low, high in tiers:
+        if n_reviews >= low and (high is None or n_reviews <= high):
+            return label
+    return None
+
+
+def user_quota_sample_reviews(
+    categories: list[str],
+    quota_per_tier: int,
+    hash_fraction: float,
+    seed: int,
+    tiers: list[tuple[str, int, int | None]] = DEFAULT_ACTIVITY_TIERS,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Muestreo por usuario: elige usuarios y se queda con **todas** sus reviews.
+
+    1. Filtro por hash del `user_id` (`hash_fraction`): acota la memoria del conteo y es
+       consistente entre categorías, así el historial cross-categoría queda completo.
+    2. Pasada 1: cuenta reviews por usuario (sumando todas las `categories`).
+    3. Cuota: hasta `quota_per_tier` usuarios al azar por tier de actividad.
+    4. Pasada 2: junta todas las reviews de los usuarios elegidos.
+
+    Devuelve (reviews, tiers_df). `tiers_df` trae el tamaño de cada tier en la población
+    hasheada y el peso (`weight` = población / elegidos) para reponderar estadísticas.
+    """
+    rng = random.Random(seed)
+
+    user_counts = Counter()
+    for category in categories:
+        for row in stream_jsonl(REVIEWS_PATH_TMPL.format(category=category)):
+            if user_in_hash_sample(row["user_id"], hash_fraction):
+                user_counts[row["user_id"]] += 1
+
+    users_by_tier = {label: [] for label, _, _ in tiers}
+    for user_id, n in user_counts.items():
+        tier = _tier_of(n, tiers)
+        if tier is not None:
+            users_by_tier[tier].append(user_id)
+
+    selected, tier_rows = {}, []
+    for label, users in users_by_tier.items():
+        users.sort()  # orden estable antes de samplear, para que el seed sea reproducible
+        chosen = users if len(users) <= quota_per_tier else rng.sample(users, quota_per_tier)
+        selected.update({u: label for u in chosen})
+        tier_rows.append({
+            "tier": label,
+            "users_population": len(users),
+            "users_selected": len(chosen),
+            "weight": len(users) / len(chosen) if chosen else float("nan"),
+        })
+    tiers_df = pd.DataFrame(tier_rows).set_index("tier")
+
+    reviews_samples = []
+    for category in categories:
+        rows = [
+            row
+            for row in stream_jsonl(REVIEWS_PATH_TMPL.format(category=category))
+            if row["user_id"] in selected
+        ]
+        df = pd.DataFrame(rows)
+        df["category"] = category
+        reviews_samples.append(df)
+    reviews_df = pd.concat(reviews_samples, ignore_index=True)
+    reviews_df["user_tier"] = reviews_df["user_id"].map(selected)
+    reviews_df["user_weight"] = reviews_df["user_tier"].map(tiers_df["weight"])
+
+    return reviews_df, tiers_df
 
 
 def build_stratified_sample(
