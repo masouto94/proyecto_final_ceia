@@ -31,7 +31,7 @@ from typing import Any, Callable
 
 import pandas as pd
 
-DEFAULT_LOG_DIR = Path(os.environ.get("CEIA_LOG_DIR", "/var/log"))
+DEFAULT_LOG_DIR = Path(os.environ.get("CEIA_LOG_DIR", "/var/log/ceia"))
 DEFAULT_RUNS_DIR = Path(os.environ.get("CEIA_RUNS_DIR", "data/runs"))
 MAX_RETRIES = 3
 RETRY_WAIT_S = 30
@@ -115,8 +115,8 @@ def _setup_logger(job_name: str, log_dir: Path, timestamp: str) -> tuple[logging
         handler = logging.FileHandler(log_path, encoding="utf-8")
     except OSError as e:
         raise SystemExit(
-            f"No se puede escribir el log en {log_dir} ({e}). Para /var/log en Ubuntu: "
-            f"`sudo usermod -aG syslog $USER` y volver a loguearse; o usar --log-dir / CEIA_LOG_DIR."
+            f"No se puede escribir el log en {log_dir} ({e}). Crearlo una vez: "
+            f"`sudo mkdir -p {log_dir} && sudo chown $USER {log_dir}`, o usar --log-dir / CEIA_LOG_DIR."
         )
     log = logging.getLogger(f"ceia.{job_name}.{timestamp}")
     log.setLevel(logging.INFO)
