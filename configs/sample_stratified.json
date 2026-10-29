@@ -1,0 +1,6 @@
+{
+  "categories": ["All_Beauty", "Amazon_Fashion", "Software"],
+  "reservoir_size": 2000,
+  "seed": 42,
+  "batch_mb": 64
+}

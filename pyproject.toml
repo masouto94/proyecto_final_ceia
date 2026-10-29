@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 sample-amazon-reviews = "proyecto_final_ceia.cli:main"
+ceia = "proyecto_final_ceia.cli:ceia"
 
 [build-system]
 requires = ["hatchling"]
