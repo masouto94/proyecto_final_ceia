@@ -1,0 +1,8 @@
+{
+  "categories": ["All_Beauty", "Amazon_Fashion"],
+  "quota_per_tier": 2000,
+  "hash_fraction": 0.25,
+  "seed": 42,
+  "tiers": [["1", 1, 1], ["2-4", 2, 4], ["5+", 5, null]],
+  "batch_mb": 64
+}

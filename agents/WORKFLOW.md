@@ -41,6 +41,23 @@ uv run sample-amazon-reviews \
     --reservoir-size 5000 --output-dir data/samples
 ```
 
+## Jobs batch en el server (`ceia`)
+
+Todo proceso que se valida en un notebook tiene también su versión batch, registrada como job en `src/proyecto_final_ceia/jobs/` y corrida con el CLI único `ceia`.
+
+```bash
+uv run ceia jobs                                    # lista los jobs
+nohup uv run ceia run sample-users --config configs/sample_users.json > /dev/null 2>&1 &
+uv run ceia status data/runs/sample-users_20261028T153012
+nohup uv run ceia resume data/runs/sample-users_20261028T153012 > /dev/null 2>&1 &
+```
+
+- **Config**: un JSON por job en `configs/` (versionado). Los campos son los de la dataclass de config del job; un campo desconocido falla al arrancar.
+- **Run dir**: `data/runs/<job>_<timestamp>/` con `manifest.json` y los resultados. El manifest es el fingerprint de la corrida: config completa, commit de git (y si había cambios sin commitear), argv, host, usuario, versión de Python, plan de batches, estado (`running` / `done` / `failed` / `interrupted`), error y un registro por intento.
+- **Log**: `/var/log/ceia/<job>_<timestamp>.log`, uno por intento (run y cada resume). Es liviano: `START` con los parámetros, `batch N/total done`, `DONE` y errores con traceback. El directorio se cambia con `--log-dir` o `CEIA_LOG_DIR`. El directorio pertenece al grupo `ceia`.
+- **Reanudación por batch**: los batches son rangos de bytes del `.jsonl` remoto (HTTP Range, `batch_mb` por batch), así que el total se conoce antes de empezar. Cada batch escribe `stages/<etapa>/batch_<n>.parquet` con rename atómico. Si la corrida se corta en el batch 243 de 500 (error, `kill`, corte de luz), `ceia resume` arranca desde el 243. Los errores de red se reintentan 3 veces antes de dar el batch por fallido.
+- **Agregar un job**: un módulo con su dataclass de config y un `JOB = Job(name, description, config_cls, stages)`. Cada `Stage` tiene `plan(config) -> [spec]`, `process(spec, ctx) -> DataFrame` y un `reduce(ctx)` opcional. Después se registra en `jobs/__init__.py` y se suma su JSON en `configs/`. `process` no puede depender del orden de los batches: el estado se combina en el `reduce` (por ejemplo, `sample-stratified` usa bottom-k con claves por hash en lugar del Algoritmo R).
+
 ## Reglas de memoria/disco a respetar en código nuevo
 
 - No usar `describe(include="all")` (ni operaciones que requieran hashear) sobre columnas con listas/dicts (`images`, `features`, `description`, `videos`, `categories`, `details`, `bought_together`) — pandas se cuelga comparando objetos no-hasheables elemento a elemento. Separar esas columnas y resumirlas aparte (null count, largo promedio) — ver [`notebooks/03_describe_sample.ipynb`](../notebooks/03_describe_sample.ipynb).

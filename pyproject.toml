@@ -17,6 +17,7 @@ dev = ["ipykernel>=7.3.0", "jupyter>=1.1.1"]
 
 [project.scripts]
 sample-amazon-reviews = "proyecto_final_ceia.cli:main"
+ceia = "proyecto_final_ceia.cli:ceia"
 
 [build-system]
 requires = ["hatchling"]
