@@ -116,7 +116,9 @@ def _setup_logger(job_name: str, log_dir: Path, timestamp: str) -> tuple[logging
     except OSError as e:
         raise SystemExit(
             f"No se puede escribir el log en {log_dir} ({e}). Crearlo una vez: "
-            f"`sudo mkdir -p {log_dir} && sudo chown $USER {log_dir}`, o usar --log-dir / CEIA_LOG_DIR."
+            f"`sudo groupadd ceia; sudo usermod -aG ceia $USER; sudo mkdir -p {log_dir}; "
+            f"sudo chown root:ceia {log_dir}; sudo chmod 2775 {log_dir}` y volver a loguearse "
+            f"(ver agents/WORKFLOW.md), o usar --log-dir / CEIA_LOG_DIR."
         )
     log = logging.getLogger(f"ceia.{job_name}.{timestamp}")
     log.setLevel(logging.INFO)
